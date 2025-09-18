@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple TODO Lists</title>
+  <style>
+    :root{font-family:system-ui,Segoe UI,Roboto,Arial;padding:0;margin:0}
+    body{display:flex;gap:18px;padding:20px;background:#f7f7fb;color:#111}
+    .sidebar{width:220px;background:#fff;border-radius:8px;padding:12px;box-shadow:0 6px 18px rgba(20,20,40,0.06)}
+    .main{flex:1;background:#fff;border-radius:8px;padding:16px;box-shadow:0 6px 18px rgba(20,20,40,0.06)}
+    h3{margin:6px 0 12px}
+    ul{list-style:none;padding:0;margin:0}
+    li.list-item{padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:6px}
+    li.list-item.selected{background:#eef2ff}
+    .controls{display:flex;gap:8px;margin-bottom:12px}
+    .controls > *{padding:8px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    input[type=text]{flex:1;padding:8px 10px;border-radius:6px;border:1px solid #ddd}
+    .task{padding:10px;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+    .task.selected{background:#fff6e6}
+    .task.completed span{text-decoration:line-through;opacity:0.6}
+    .small{font-size:13px;color:#666}
+    .hint{margin-top:10px;font-size:13px;color:#666}
+    button{background:#2563eb;color:#fff;border:none}
+    button.ghost{background:#fff;color:#111;border:1px solid #ddd}
+    .right-actions{margin-left:auto;display:flex;gap:8px}
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h3>Lists</h3>
+    <div class="controls">
+      <button id="btnNewList" class="ghost">Create New List</button>
+    </div>
+    <ul id="lists"></ul>
+    <p class="hint">Click a list to open it. Default list is created for you.</p>
+  </div>
+
+  <div class="main">
+    <h3 id="currentListTitle">Tasks — Default</h3>
+    <div class="controls">
+      <input id="taskInput" type="text" placeholder="Type new task and click Add Task" />
+      <button id="btnAddTask">Add Task</button>
+      <button id="btnComplete" class="ghost">Complete Selected</button>
+    </div>
+
+    <ul id="tasks"></ul>
+    <p class="small">Tip: click a task to select it. Use <strong>Complete Selected</strong> to strike-through selected tasks. Double-click a task to toggle completion too.</p>
+  </div>
+
+  <script>
+    const listsEl = document.getElementById('lists');
+    const tasksEl = document.getElementById('tasks');
+    const taskInput = document.getElementById('taskInput');
+    const btnNewList = document.getElementById('btnNewList');
+    const btnAddTask = document.getElementById('btnAddTask');
+    const btnComplete = document.getElementById('btnComplete');
+    const currentListTitle = document.getElementById('currentListTitle');
+
+    const app = {
+      lists: [],
+      activeListId: null,
+      nextListId: 1,
+      nextTaskId: 1
+    };
+
+    function createList(name = 'Default'){
+      const id = 'list-' + app.nextListId++;
+      const list = { id, name: name || 'Untitled', tasks: [] };
+      app.lists.push(list);
+      renderLists();
+      setActiveList(id);
+      return list;
+    }
+
+    function renderLists(){
+      listsEl.innerHTML = '';
+      app.lists.forEach(list =>{
+        const li = document.createElement('li');
+        li.textContent = list.name;
+        li.className = 'list-item' + (app.activeListId === list.id ? ' selected' : '');
+        li.dataset.id = list.id;
+        li.addEventListener('click', () => setActiveList(list.id));
+        listsEl.appendChild(li);
+      });
+    }
+
+    function setActiveList(id){
+      app.activeListId = id;
+      renderLists();
+      renderTasks();
+      const active = app.lists.find(l=>l.id === id);
+      currentListTitle.textContent = 'Tasks — ' + (active ? active.name : 'Unknown');
+    }
+
+    function addTask(text){
+      if(!text || !text.trim()) return;
+      const list = app.lists.find(l=>l.id === app.activeListId);
+      if(!list) return alert('Please create or select a list first');
+      const task = { id: 'task-' + app.nextTaskId++, text: text.trim(), completed: false };
+      list.tasks.push(task);
+      taskInput.value = '';
+      renderTasks();
+    }
+
+    function renderTasks(){
+      tasksEl.innerHTML = '';
+      const list = app.lists.find(l=>l.id === app.activeListId);
+      if(!list) return;
+      list.tasks.forEach(task =>{
+        const li = document.createElement('li');
+        li.className = 'task' + (task.completed ? ' completed' : '');
+        li.dataset.id = task.id;
+        const span = document.createElement('span');
+        span.textContent = task.text;
+        li.appendChild(span);
+
+        li.addEventListener('click', (e) =>{
+          li.classList.toggle('selected');
+        });
+
+        li.addEventListener('dblclick', () =>{
+          task.completed = !task.completed;
+          renderTasks();
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'right-actions';
+
+        const del = document.createElement('button');
+        del.textContent = 'Delete';
+        del.className = 'ghost';
+        del.addEventListener('click', (ev) =>{
+          ev.stopPropagation();
+          list.tasks = list.tasks.filter(t=>t.id !== task.id);
+          renderTasks();
+        });
+        actions.appendChild(del);
+
+        li.appendChild(actions);
+        tasksEl.appendChild(li);
+      });
+    }
+
+    function completeSelected(){
+      const list = app.lists.find(l=>l.id === app.activeListId);
+      if(!list) return;
+      const selectedEls = Array.from(tasksEl.querySelectorAll('.task.selected'));
+      if(selectedEls.length === 0) return alert('Select at least one task to complete (click the task).');
+      selectedEls.forEach(el =>{
+        const tid = el.dataset.id;
+        const task = list.tasks.find(t=>t.id === tid);
+        if(task) task.completed = true;
+        el.classList.remove('selected');
+      });
+      renderTasks();
+    }
+
+    btnNewList.addEventListener('click', () =>{
+      const name = prompt('Enter new list name:');
+      if(name === null) return;
+      createList(name || 'Untitled');
+    });
+
+    btnAddTask.addEventListener('click', () => addTask(taskInput.value));
+    taskInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') addTask(taskInput.value); });
+    btnComplete.addEventListener('click', completeSelected);
+
+    createList('Default');
+
+    window._todoApp = app;
+  </script>
+</body>
+</html>
